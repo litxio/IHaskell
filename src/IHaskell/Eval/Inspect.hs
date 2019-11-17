@@ -18,6 +18,8 @@ import           IHaskell.Eval.Evaluate (Interpreter)
 import           IHaskell.Display
 import           IHaskell.Eval.Util (getType)
 
+import Control.Monad.Catch (handle)
+
 -- | Characters used in Haskell operators.
 operatorChars :: String
 operatorChars = "!#$%&*+./<=>?@\\^|-~:"
@@ -44,7 +46,7 @@ inspect code pos = do
   let identifier = getIdentifier code pos
       handler :: SomeException -> Interpreter (Maybe a)
       handler _ = return Nothing
-  response <- ghandle handler (Just <$> getType identifier)
+  response <- handle handler (Just <$> getType identifier)
   let prefix = identifier ++ " :: "
       fmt str = Display [plain $ prefix ++ str]
   return $ fmt <$> response

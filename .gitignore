@@ -24,3 +24,4 @@ cabal.sandbox.config
 .tmp3
 stack.yaml.lock
 result
+tags

@@ -750,6 +750,8 @@ replyType _ = Nothing
 -- | Data for display: a string with associated MIME type.
 data DisplayData = DisplayData MimeType Text
   deriving (Typeable, Generic)
+instance ToJSON DisplayData
+instance FromJSON DisplayData
 
 -- We can't print the actual data, otherwise this will be printed every time it gets computed
 -- because of the way the evaluator is structured. See how `displayExpr` is computed.
@@ -780,6 +782,8 @@ data MimeType = PlainText
               | MimeVegalite
               | MimeVdom
   deriving (Eq, Typeable, Generic)
+instance ToJSON MimeType
+instance FromJSON MimeType
 
 -- Extract the plain text from a list of displays.
 extractPlain :: [DisplayData] -> String

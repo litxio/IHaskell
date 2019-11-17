@@ -398,42 +398,42 @@ replyTo _ message _ state = do
 
 -- | Handle comm messages
 handleComm :: (Message -> IO ()) -> KernelState -> Message -> MessageHeader -> Interpreter KernelState
-handleComm send kernelState req replyHeader = do
-  -- MVars to hold intermediate data during publishing
-  displayed <- liftIO $ newMVar []
-  updateNeeded <- liftIO $ newMVar False
-  pOut <- liftIO $ newMVar []
+handleComm send kernelState req replyHeader = error "unexpected call to handleComm" -- do
+  -- -- MVars to hold intermediate data during publishing
+  -- displayed <- liftIO $ newMVar []
+  -- updateNeeded <- liftIO $ newMVar False
+  -- pOut <- liftIO $ newMVar []
 
-  let widgets = openComms kernelState
-      uuid = commUuid req
-      dat = commData req
-      communicate value = do
-        head <- dupHeader replyHeader CommDataMessage
-        send $ CommData head uuid value
-      toUsePager = usePager kernelState
+  -- let widgets = openComms kernelState
+  --     uuid = commUuid req
+  --     dat = commData req
+  --     communicate value = do
+  --       head <- dupHeader replyHeader CommDataMessage
+  --       send $ CommData head uuid value
+  --     toUsePager = usePager kernelState
 
-  -- Create a publisher according to current state, use that to build
-  -- a function that executes an IO action and publishes the output to
-  -- the frontend simultaneously.
-  let run = capturedIO publish kernelState
-      publish = publishResult send replyHeader displayed updateNeeded pOut toUsePager
+  -- -- Create a publisher according to current state, use that to build
+  -- -- a function that executes an IO action and publishes the output to
+  -- -- the frontend simultaneously.
+  -- let run = capturedIO publish kernelState
+  --     publish = publishResult send replyHeader displayed updateNeeded pOut toUsePager
 
-  newState <- case Map.lookup uuid widgets of
-    Nothing -> return kernelState
-    Just (Widget widget) ->
-      case mhMsgType $ header req of
-        CommDataMessage -> do
-          disp <- run $ comm widget dat communicate
-          pgrOut <- liftIO $ readMVar pOut
-          liftIO $ publish (FinalResult disp (if toUsePager then pgrOut else []) []) Success
-          return kernelState
-        CommCloseMessage -> do
-          disp <- run $ close widget dat
-          pgrOut <- liftIO $ readMVar pOut
-          liftIO $ publish (FinalResult disp (if toUsePager then pgrOut else []) []) Success
-          return kernelState { openComms = Map.delete uuid widgets }
-        _ ->
-          -- Only sensible thing to do.
-          return kernelState
+  -- newState <- case Map.lookup uuid widgets of
+  --   Nothing -> return kernelState
+  --   Just (Widget widget) ->
+  --     case mhMsgType $ header req of
+  --       CommDataMessage -> do
+  --         disp <- run $ comm widget dat communicate
+  --         pgrOut <- liftIO $ readMVar pOut
+  --         liftIO $ publish (FinalResult disp (if toUsePager then pgrOut else []) []) Success
+  --         return kernelState
+  --       CommCloseMessage -> do
+  --         disp <- run $ close widget dat
+  --         pgrOut <- liftIO $ readMVar pOut
+  --         liftIO $ publish (FinalResult disp (if toUsePager then pgrOut else []) []) Success
+  --         return kernelState { openComms = Map.delete uuid widgets }
+  --       _ ->
+  --         -- Only sensible thing to do.
+  --         return kernelState
 
-  return newState
+  -- return newState

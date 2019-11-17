@@ -88,7 +88,9 @@ library
                        utf8-string          -any,
                        vector               -any,
                        ipython-kernel       >=0.9.1,
-                       ghc-boot             >=8.0 && <8.9
+                       ghc-boot             >=8.0 && <8.9,
+                       ptghci               -any,
+                       exceptions           -any
 
   exposed-modules: IHaskell.Display
                    IHaskell.Convert
@@ -105,6 +107,7 @@ library
                    IHaskell.Eval.ParseShell
                    IHaskell.Eval.Widgets
                    IHaskell.Eval.Util
+                   IHaskell.Eval.PtGhci
                    IHaskell.Publish
                    IHaskell.IPython
                    IHaskell.IPython.Stdin

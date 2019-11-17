@@ -1,4 +1,4 @@
-{-# LANGUAGE NoImplicitPrelude, CPP #-}
+{-# LANGUAGE NoImplicitPrelude, CPP, FlexibleContexts, OverloadedStrings #-}
 
 module IHaskell.Eval.Util (
     -- * Initialization
@@ -60,6 +60,11 @@ import           CmdLineParser (warnMsg)
 #endif
 
 import           GHC.LanguageExtensions
+import Control.Monad.Reader
+import Control.Monad.Catch
+import Language.Haskell.PtGhci.Ghci
+import Language.Haskell.PtGhci.Engine
+import qualified Data.Text as T
 
 type ExtensionFlag = Extension
 
@@ -377,16 +382,19 @@ cleanUpDuplicateInstances = modifySession $ \hscEnv ->
 
 
 -- | Get the type of an expression and convert it to a string.
-getType :: GhcMonad m => String -> m String
+getType :: (MonadIO m, MonadReader Ghci m) => String -> m String
 getType expr = do
-#if MIN_VERSION_ghc(8,2,0)
-  result <- exprType TM_Inst expr
-#else
-  result <- exprType expr
-#endif
-  flags <- getSessionDynFlags
-  let typeStr = O.showSDocUnqual flags $ O.ppr result
-  return typeStr
+  ghci <- ask
+  (out, err) <- liftIO $ runLine ghci $ ":t "<>T.pack expr
+  return $ T.unpack $ T.unlines out
+-- #if MIN_VERSION_ghc(8,2,0)
+--   result <- exprType TM_Inst expr
+-- #else
+--   result <- exprType expr
+-- #endif
+--   flags <- getSessionDynFlags
+--   let typeStr = O.showSDocUnqual flags $ O.ppr result
+--   return typeStr
 
 -- | This is unfoldM from monad-loops. It repeatedly runs an IO action until it return Nothing, and
 -- puts all the Justs in a list. If you find yourself using more functionality from monad-loops,

@@ -41,7 +41,7 @@ module IHaskell.Types (
 
 import           IHaskellPrelude
 
-import           Data.Aeson (ToJSON (..), Value, (.=), object)
+import           Data.Aeson (ToJSON (..), FromJSON (..), Value, (.=), object)
 import           Data.Function (on)
 import           Data.Serialize
 import           GHC.Generics
@@ -142,6 +142,8 @@ data Display = Display [DisplayData]
   deriving (Show, Typeable, Generic)
 
 instance Serialize Display
+instance ToJSON Display
+instance FromJSON Display
 
 instance Semigroup Display where
   ManyDisplay a <> ManyDisplay b = ManyDisplay (a ++ b)

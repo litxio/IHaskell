@@ -1,4 +1,5 @@
-{-# LANGUAGE CPP, NoImplicitPrelude, DoAndIfThenElse, TypeFamilies, FlexibleContexts #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, DoAndIfThenElse, TypeFamilies, FlexibleContexts
+             ,NamedFieldPuns#-}
 
 {- |
 Description:    Generates tab completion options.
@@ -37,6 +38,12 @@ import           IHaskell.Eval.Evaluate (Interpreter)
 import           IHaskell.Eval.ParseShell (parseShell)
 import           StringUtils (replace, strip, split)
 
+import Control.Monad.Reader
+import Language.Haskell.PtGhci.Engine
+import Language.Haskell.PtGhci.PtgResponse (PtgResponse(..))
+import qualified Data.Text as T
+import qualified Debug.Trace as Debug
+
 data CompletionType = Empty
                     | Identifier String
                     | DynFlag String
@@ -57,7 +64,7 @@ extName :: FlagSpec flag -> String
 extName (FlagSpec { flagSpecName = name }) = name
 
 complete :: String -> Int -> Interpreter (String, [String])
-complete code posOffset = do
+complete code posOffset = Debug.traceShow (code, posOffset) $ do
   -- Get the line of code which is being completed and offset within that line
   let findLine offset (first:rest) =
         if offset <= length first
@@ -66,76 +73,83 @@ complete code posOffset = do
       findLine _ [] = error $ "Could not find line: " ++ show (map length $ lines code, posOffset)
       (pos, line) = findLine posOffset (lines code)
 
+  ghci <- ask
+  cmp <- liftIO $ runCompletion ghci (T.pack $ take pos line)
+  case cmp of 
+    CompletionResponse{success, startChars, candidates} -> do
+      let matched = drop (T.length startChars) $ take pos line
+      Debug.traceShow cmp $ return (matched, T.unpack <$> candidates)
+    _ -> error $ "Unexpected response from runCompletion: "<>show cmp
 
-  flags <- getSessionDynFlags
-  rdrNames <- map (showPpr flags) <$> getRdrNamesInScope
-  scopeNames <- nub <$> map (showPpr flags) <$> getNamesInScope
-  let isQualified = ('.' `elem`)
-      unqualNames = nub $ filter (not . isQualified) rdrNames
-      qualNames = nub $ scopeNames ++ filter isQualified rdrNames
+  -- flags <- getSessionDynFlags
+  -- rdrNames <- map (showPpr flags) <$> getRdrNamesInScope
+  -- scopeNames <- nub <$> map (showPpr flags) <$> getNamesInScope
+  -- let isQualified = ('.' `elem`)
+  --     unqualNames = nub $ filter (not . isQualified) rdrNames
+  --     qualNames = nub $ scopeNames ++ filter isQualified rdrNames
 
-  let Just db = pkgDatabase flags
-      getNames = map (moduleNameString . exposedName) . exposedModules
-      moduleNames = nub $ concatMap getNames $ concatMap snd db
+  -- let Just db = pkgDatabase flags
+  --     getNames = map (moduleNameString . exposedName) . exposedModules
+  --     moduleNames = nub $ concatMap getNames $ concatMap snd db
 
-  let target = completionTarget line pos
-      completion = completionType line pos target
+  -- let target = completionTarget line pos
+  --     completion = completionType line pos target
 
-  let matchedText =
-        case completion of
-          HsFilePath _ match -> match
-          FilePath _ match   -> match
-          _                  -> intercalate "." target
+  -- let matchedText =
+  --       case completion of
+  --         HsFilePath _ match -> match
+  --         FilePath _ match   -> match
+  --         _                  -> intercalate "." target
 
-  options <- case completion of
-               Empty -> return []
+  -- options <- case completion of
+  --              Empty -> return []
 
-               Identifier candidate ->
-                 return $ filter (candidate `isPrefixOf`) unqualNames
+  --              Identifier candidate ->
+  --                return $ filter (candidate `isPrefixOf`) unqualNames
 
-               Qualified mName candidate -> do
-                 let prefix = intercalate "." [mName, candidate]
-                     completions = filter (prefix `isPrefixOf`) qualNames
-                 return completions
+  --              Qualified mName candidate -> do
+  --                let prefix = intercalate "." [mName, candidate]
+  --                    completions = filter (prefix `isPrefixOf`) qualNames
+  --                return completions
 
-               ModuleName previous candidate -> do
-                 let prefix = if null previous
-                                then candidate
-                                else intercalate "." [previous, candidate]
-                 return $ filter (prefix `isPrefixOf`) moduleNames
+  --              ModuleName previous candidate -> do
+  --                let prefix = if null previous
+  --                               then candidate
+  --                               else intercalate "." [previous, candidate]
+  --                return $ filter (prefix `isPrefixOf`) moduleNames
 
-               DynFlag ext -> do
-                 -- Possibly leave out the fLangFlags?
-                 let otherNames = ["-package", "-Wall", "-w"]
+  --              DynFlag ext -> do
+  --                -- Possibly leave out the fLangFlags?
+  --                let otherNames = ["-package", "-Wall", "-w"]
 
-                     fNames = map extName fFlags ++
-                              map extName wWarningFlags ++
-                              map extName fLangFlags
-                     fNoNames = map ("no" ++) fNames
-                     fAllNames = map ("-f" ++) (fNames ++ fNoNames)
+  --                    fNames = map extName fFlags ++
+  --                             map extName wWarningFlags ++
+  --                             map extName fLangFlags
+  --                    fNoNames = map ("no" ++) fNames
+  --                    fAllNames = map ("-f" ++) (fNames ++ fNoNames)
 
-                     xNames = map extName xFlags
-                     xNoNames = map ("No" ++) xNames
-                     xAllNames = map ("-X" ++) (xNames ++ xNoNames)
+  --                    xNames = map extName xFlags
+  --                    xNoNames = map ("No" ++) xNames
+  --                    xAllNames = map ("-X" ++) (xNames ++ xNoNames)
 
-                     allNames = xAllNames ++ otherNames ++ fAllNames
+  --                    allNames = xAllNames ++ otherNames ++ fAllNames
 
-                 return $ filter (ext `isPrefixOf`) allNames
+  --                return $ filter (ext `isPrefixOf`) allNames
 
-               Extension ext -> do
-                 let xNames = map extName xFlags
-                     xNoNames = map ("No" ++) xNames
-                 return $ filter (ext `isPrefixOf`) $ xNames ++ xNoNames
+  --              Extension ext -> do
+  --                let xNames = map extName xFlags
+  --                    xNoNames = map ("No" ++) xNames
+  --                return $ filter (ext `isPrefixOf`) $ xNames ++ xNoNames
 
-               HsFilePath lineUpToCursor _match -> completePathWithExtensions [".hs", ".lhs"]
-                                                    lineUpToCursor
+  --              HsFilePath lineUpToCursor _match -> completePathWithExtensions [".hs", ".lhs"]
+  --                                                   lineUpToCursor
 
-               FilePath lineUpToCursor _match -> completePath lineUpToCursor
+  --              FilePath lineUpToCursor _match -> completePath lineUpToCursor
 
-               KernelOption str -> return $
-                 filter (str `isPrefixOf`) (concatMap getOptionName kernelOpts)
+  --              KernelOption str -> return $
+  --                filter (str `isPrefixOf`) (concatMap getOptionName kernelOpts)
 
-  return (matchedText, options)
+  -- return (matchedText, options)
 
 
 -- | Get which type of completion this is from the surrounding context.
